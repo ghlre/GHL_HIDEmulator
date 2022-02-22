@@ -17,18 +17,20 @@ namespace GHL_HIDEmulator
         {
             Console.Title = "GHL HID Emulator";
             UsbDevice guitar = null;
+            bool isPS4 = false;
             foreach(WinUsbRegistry device in LibUsbDotNet.UsbDevice.AllWinUsbDevices)
             {
                 // USB\VID_12BA&PID_074B
-                if (device.Vid == 0x12BA && device.Pid == 0x074B)
+                if ((device.Vid == 0x12BA && device.Pid == 0x074B) || (device.Vid == 0x1430 && device.Pid == 0x07BB))
                 {
                     guitar = device.Device;
+                    isPS4 = (device.Pid == 0x07BB);
                 }
             }
             if (guitar == null)
             {
                 Console.WriteLine("Could not find any Guitar Hero Live guitars.");
-                Console.WriteLine("Make sure you are using a PS3/Wii U Guitar Hero Live dongle with the WinUSB driver installed.");
+                Console.WriteLine("Make sure you are using a PS3/Wii U/PS4 Guitar Hero Live dongle with the WinUSB driver installed.");
                 Console.WriteLine("Press any key to exit...");
                 Console.ReadKey(true);
                 return;
@@ -46,21 +48,25 @@ namespace GHL_HIDEmulator
                 Console.ReadKey(true);
                 return;
             }
-            
+
             IXbox360Controller controller = client.CreateXbox360Controller();
             controller.Connect();
             Console.WriteLine($"Found a Guitar Hero Live guitar!");
 
             var reader = guitar.OpenEndpointReader(ReadEndpointID.Ep01);
 
-            byte[] readBuffer = new byte[27];
+            byte[] readBuffer = new byte[100];
             int runner = 0;
             while (true)
             {
                 if (runner == 0)
                 {
                     // Send control packet (to enable strumming)
-                    byte[] buffer = new byte[9] { 0x02, 0x08, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+                    byte[] buffer;
+                    if (isPS4)
+                        buffer = new byte[9] { 0x30, 0x02, 0x08, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00 };
+                    else
+                        buffer = new byte[9] { 0x02, 0x08, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
                     int bytesWrote;
                     UsbSetupPacket setupPacket = new UsbSetupPacket(0x21, 0x09, 0x0201, 0x0000, 0x0008);
                     guitar.ControlTransfer(ref setupPacket, buffer, 0x0008, out bytesWrote);
